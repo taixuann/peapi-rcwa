@@ -23,11 +23,15 @@ def main():
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--all', action='store_true', help='Run the full simulation (calculation and plotting).')
     group.add_argument('--structure', action='store_true', help='Only visualize the structure drawing.')
+    group.add_argument('--perp', action='store_true', help='Only plot the reflectivity dip at k_parallel = 0.')
+    group.add_argument('--paral', action='store_true', help='Plot the reflectivity vs energy and mark the polariton resonances.')
+    group.add_argument('--calc', action='store_true', help='Calculate the reflectivity dip at k_parallel = 0.')
+    
 
     args = parser.parse_args()
 
     # --- Hardcoded constant parameters ---
-    eV_min = 1.6
+    eV_min = 2.0
     eV_max = 2.8
     eV_step = 0.001
     k_min = 0.0
@@ -50,15 +54,14 @@ def main():
         if args.all:
             print(f"\n--- Running simulation for active layer thickness a = {a} um ---")
             S4_calculation.S4_calculation(eV_min, eV_max, eV_step, k_min, k_max, k_step, a, NoX, d, t, config, N)
-            #plotting.reflectivity_dispersion(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config)  
-            #plotting.reflectivity_dip_k0(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config)
-            plotting.polariton_dips_connect(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config)
+            plotting.reflectivity_dispersion(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config)
+            plotting.reflectivity_dip_k0(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config)
+        elif args.calc:
+            S4_calculation.S4_calculation(eV_min, eV_max, eV_step, k_min, k_max, k_step, a, NoX, d, t, config, N)
         elif args.perp:
             plotting.reflectivity_dip_k0(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config)
         elif args.paral:
             plotting.reflectivity_dispersion(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config)
-        elif args.calc:
-            S4_calculation.S4_calculation(eV_min, eV_max, eV_step, k_min, k_max, k_step, a, NoX, d, t, config, N)
         elif args.structure:
             print(f"\n--- Visualizing the structure drawing ---")
             plotting.visualize_structure(config, a, d)

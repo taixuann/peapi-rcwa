@@ -66,14 +66,15 @@ def reflectivity_dispersion(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t,
     print("r2", R_upper.shape)
 
     # === Plotting ===
-    
-    plt.pcolormesh(X, Y, R_all, cmap='hot',shading='auto',vmin=0,vmax=1)
+    plt.figure(figsize=(7,5), dpi=200)
+    plt.pcolormesh(X, Y, R_all, cmap='hot',shading='auto',vmin=0,vmax=0.4)
     plt.axhline(E_X, color='cyan', linestyle='--', linewidth=1)
     plt.xlabel(r"kxy (2$\pi \mu^{-1}$)", fontweight='bold', labelpad=15)
     plt.ylabel("Energy (eV)", fontweight='bold', labelpad=15)
     plt.axis([-k_max, k_max, eV_min, eV_max])
     plt.xticks([t for t in np.arange(-k_max, k_max+0.1, k_max/2)])
     plt.yticks(np.arange(eV_min, eV_max, 0.2))
+    plt.tight_layout()
 
     cbar = plt.colorbar(label='Reflectivity')
     cbar.set_ticks([t for t in np.arange(0,1.1,0.2)])
@@ -88,13 +89,12 @@ def reflectivity_dispersion(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t,
                "k_max(" + str(k_max) + ')_'+
                "k_step(" + str(k_step) +')_'+
                'k-E-reflectivity.png')
-    plt.savefig(save_filename, dpi=600)
+    plt.savefig(save_filename, dpi=200, bbox_inches='tight')
     plt.show()
     
     bar.next()
     bar.finish()
     return R_all
-
 
 def reflectivity_dip_k0(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config):
     """
@@ -112,7 +112,7 @@ def reflectivity_dip_k0(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, 
 
     # Energy & k grids
     eV_range = np.arange(eV_min, eV_max + np.float(eV_step/2), eV_step)
-    kx_All = np.arange(-k_max, k_max + k_step/2, k_step)
+    _, _, n_PEAPI_all, _ = material.PEAPI(eV_range)
 
     # Load reflectivity data
     filename = ('./data/' + config_name + "d(" + str(d) + ")_" +
@@ -145,109 +145,124 @@ def reflectivity_dip_k0(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, 
     E_axis = eV_range
     R_k0 = R_all[:, center_idx]
 
-    # --- Find reflectivity dips ---
+    # --- Find reflectivity dips and peaks relative to E_X ---
     prominence_rel = 0.02
     abs_prom = max(1e-4, prominence_rel * (np.nanmax(R_k0) - np.nanmin(R_k0)))
-    peaks_k0, props_k0 = find_peaks(-R_k0, prominence=abs_prom, distance=3)
 
-    # Sort dips by prominence (strongest first)
-    if 'prominences' in props_k0:
-        order = np.argsort(props_k0['prominences'])[::-1]
-    else:
-        order = np.argsort(-R_k0[peaks_k0])
-    peaks_k0 = peaks_k0[order]
+    # Split the energy and reflectivity at E_X
+    below_mask = E_axis < E_X
+    above_mask = E_axis > E_X
 
-    # --- Compute k⊥ at k|| = 0 ---
-    hc = 1.23984
-    k_total = 2 * np.pi * n_medium * eV_range / hc
-    k_perp = k_total  # at k∥ = 0
+    E_below, R_below = E_axis[below_mask], R_k0[below_mask]
+    E_above, R_above = E_axis[above_mask], R_k0[above_mask]
+
+    # Dips below E_X (minima)
+    dips_idx, dips_props = find_peaks(-R_below, prominence=abs_prom, distance=3)
+    # Peaks above E_X (maxima)
+    peaks_idx, peaks_props = find_peaks(R_above, prominence=abs_prom, distance=3)
+    valid = R_above[peaks_idx] < 0.5
+    peaks_idx = peaks_idx[valid]
+    for key in peaks_props:
+        peaks_props[key] = peaks_props[key][valid]
+
+    # Then get the energies of those peaks
+    E_peaks = E_above[peaks_idx]
+    E_dips = E_below[dips_idx]
+    E_peaks = E_above[peaks_idx]
 
     # --- Plot ---
     plt.figure(figsize=(7,5), dpi=200)
     plt.plot(E_axis, R_k0, lw=1.5, label='Reflectivity (k∥=0)')
-    colors = plt.cm.tab10(np.linspace(0,1,max(1,len(peaks_k0))))
-    for idx, p in enumerate(peaks_k0):
-        E_p = E_axis[p]
-        R_p = R_k0[p]
-        plt.scatter(E_p, R_p, color=colors[idx % len(colors)], s=60, edgecolor='k', zorder=5)
-        plt.text(E_p + 0.01, R_p + 0.02, f"{E_p:.3f} eV", fontsize=8)
 
-    plt.xlabel("Energy (eV)")
-    plt.ylabel("Reflectivity (a.u.)")
-    plt.title("Reflectivity at k∥ = 0 with detected dips")
+    # Mark dips and peaks
+    plt.scatter(E_dips, R_below[dips_idx], color='blue', label='Dips (<E_X)', edgecolor='k', s=60, zorder=5)
+    plt.scatter(E_peaks, R_above[peaks_idx], color='red', label='Peaks (>E_X)', edgecolor='k', s=60, zorder=5)
+
+    plt.axvline(E_X, color='cyan', linestyle='--', label='Exciton energy')
+    plt.xlabel("Energy (eV)", fontweight='bold', labelpad=15)
+    plt.ylabel("Reflectivity (a.u.)", fontweight = 'bold', labelpad=15)
+    plt.title("Reflectivity at k∥ = 0 (dips < E_X, peaks > E_X)")
     plt.grid(alpha=0.3)
     plt.legend()
     plt.tight_layout()
-    plt.savefig('./graphics/reflectivity_dip_k0.png', dpi=300, bbox_inches='tight')
-    plt.show()
-
-    print("Detected dip energies (polariton modes):", E_axis[peaks_k0])
-
-
-def polariton_dips_connect(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config):
-    """
-    Extract reflectivity dips from S4 output, plot E (x-axis) vs k_perp (y-axis)
-    with LPB and UPB connections, and exciton energy line.
-    """
-    from scipy.signal import find_peaks
-
-    # --- Config setup ---
-    if config == "air":
-        config_name = "Configuration of Air_PEAPI_Air_"
-        n_medium = 1.0
-    else:
-        config_name = "Configuration of SiO2_PEAPI_SiO2_"
-        _, _, n_SiO2, _ = material.SiO2(eV_min)
-        n_medium = np.real(n_SiO2)
-
-    eV_range = np.arange(eV_min, eV_max + np.float(eV_step/2), eV_step)
-    kx_All = np.arange(-k_max, k_max + k_step/2, k_step)
-
-    # --- Load reflectivity ---
-    filename = ('./data/' + config_name + "d(" + str(d) + ")_" +
+    plt.savefig('./graphics/' + config_name + "d(" + str(d) + ")_" +
                 "t(" + str(t) + ")_" + "a(" + str(a) + ")_" +
                 "eV_min(" + str(eV_min)+')_' +
                 "eV_max(" + str(eV_max)+')_' +
                 "eV_step(" + str(eV_step) + ')_' +
-                "k_max(" + str(k_max) + ')_'+
-                "k_step(" + str(k_step) + ')_' +
-                'k-E-reflectivity.csv')
-    R = np.loadtxt(filename, delimiter=',')
-
-    LPB, UPB, kx_valid = [], [], []
-    for i in range(R.shape[1]):
-        R_col = R[:, i]
-        peaks, props = find_peaks(-R_col, prominence=0.01)
-        if len(peaks) == 0:
-            continue
-        energies = eV_range[peaks]
-        energies.sort()
-        LPB.append(energies[0])
-        UPB.append(energies[-1] if len(energies) > 1 else np.nan)
-        kx_valid.append(kx_All[i])
-
-    LPB = np.array(LPB)
-    UPB = np.array(UPB)
-    kx_valid = np.array(kx_valid)
-
-    # --- Convert to k_perp ---
-    hc = 1.23984
-    k_perp_L = np.sqrt(np.maximum((2*np.pi*n_medium*LPB/hc)**2 - kx_valid**2, 0))
-    k_perp_U = np.sqrt(np.maximum((2*np.pi*n_medium*UPB/hc)**2 - kx_valid**2, 0))
-
-    # --- Plot ---
-    plt.figure(figsize=(6,5), dpi=200)
-    plt.plot(LPB, k_perp_L, 'r-', lw=2, label='Lower polariton')
-    plt.plot(UPB, k_perp_U, 'b-', lw=2, label='Upper polariton')
-    plt.axvline(E_X, color='k', linestyle='--', label='Exciton energy')
-    plt.xlabel("Energy (eV)")
-    plt.ylabel(r"$k_\perp$ ($\mu m^{-1}$)")
-    plt.title("Polariton dispersion from reflectivity dips")
-    plt.legend()
-    plt.grid(alpha=0.3)
-    plt.tight_layout()
-    plt.savefig('./graphics/polariton_dispersion_lines.png', dpi=400)
+                "k_max(" + str(k_max) + ')_' +
+                "k_step(" + str(k_step) + ')_' + 'reflectivity_dip_k0_split.png', dpi=300, bbox_inches='tight')
     plt.show()
+
+    print("Detected dips (<E_X):", E_dips)
+    print("Detected peaks (>E_X):", E_peaks)
+    # === Plotting the k_perp vs energy ===
+
+    idx_d = np.array([np.argmin(np.abs(eV_range - E)) for E in E_dips])
+    n_dips  = n_PEAPI_all[idx_d]
+    k_perp_dips = np.sqrt(((E_dips * n_dips) / 1.2398419)**2)
+
+    # For peaks
+    idx_p = np.array([np.argmin(np.abs(eV_range - E)) for E in E_peaks])
+    n_peaks = n_PEAPI_all[idx_p]
+    k_perp_peaks = np.sqrt(((E_peaks * n_peaks) / 1.2398419)**2)
+    plt.figure(figsize=(7,5), dpi=200)
+
+    plt.plot(E_dips, k_perp_dips, 'bo-', label='Lower polariton dips (k⊥)')
+    plt.plot(E_peaks, k_perp_peaks, 'ro-', label='Upper polariton peaks (k⊥)')
+
+    plt.xlabel("Energy (eV)")
+    plt.ylabel(r"$k_\perp$ (2π/µm)")
+    plt.title("Polariton dispersion at k∥=0")
+    plt.grid(alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig('./graphics/' + config_name + "d(" + str(d) + ")_" +
+                "t(" + str(t) + ")_" + "a(" + str(a) + ")_" +
+                "eV_min(" + str(eV_min)+')_' +
+                "eV_max(" + str(eV_max)+')_' +
+                "eV_step(" + str(eV_step) + ')_' +
+                "k_max(" + str(k_max) + ')_' +
+                "k_step(" + str(k_step) + ')_' + 'polariton_dispersion_kperp_vs_E.png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+
+def calculate_rabi_splitting(lower_polariton_dips, upper_polariton_peaks, E_X):
+    """
+    Takes the dips and peaks from the k=0 spectrum and calculates
+    the Rabi splitting.
+    """
+    print("\n--- Inside calculate_rabi_splitting ---")
+    print(f"Received dips: {lower_polariton_dips}")
+    print(f"Received peaks: {upper_polariton_peaks}")
+    
+    # Example calculation:
+    # Find the lower polariton (LP) and upper polariton (UP)
+    # LP is the dip closest to E_X
+    # UP is the peak closest to E_X
+    
+    rabi_splitting_mev = None
+    
+    if len(lower_polariton_dips) > 0 and len(upper_polariton_peaks) > 0:
+        # np.max(dips) gives the dip with the highest energy (closest to E_X)
+        lp_energy = np.max(lower_polariton_dips)
+        
+        # np.min(peaks) gives the peak with the lowest energy (closest to E_X)
+        up_energy = np.min(upper_polariton_peaks)
+        
+        # Calculate splitting and convert from eV to meV
+        splitting_eV = up_energy - lp_energy
+        rabi_splitting_mev = splitting_eV * 1000
+        
+        print(f"Lower Polariton (LP) at: {lp_energy:.4f} eV")
+        print(f"Upper Polariton (UP) at: {up_energy:.4f} eV")
+        print(f"Calculated Rabi Splitting: {rabi_splitting_mev:.2f} meV")
+    
+    else:
+        print("Could not find both a dip and a peak to calculate splitting.")
+        
+    # You can also return the calculated value
+    return rabi_splitting_mev
 
 
 # === Visualization of structure and incident light ===
