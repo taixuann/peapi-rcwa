@@ -25,14 +25,14 @@ def main():
     group.add_argument('--structure', action='store_true', help='Only visualize the structure drawing.')
     group.add_argument('--perp', action='store_true', help='Only plot the reflectivity dip at k_parallel = 0.')
     group.add_argument('--paral', action='store_true', help='Plot the reflectivity vs energy and mark the polariton resonances.')
-    group.add_argument('--calc', action='store_true', help='Calculate the reflectivity dip at k_parallel = 0.')
+    group.add_argument('--calc', action='store_true', help='Only run the S4 calculation and save the reflectivity data.')
     
 
     args = parser.parse_args()
 
     # --- Hardcoded constant parameters ---
-    eV_min = 2.0
-    eV_max = 2.8
+    eV_min = 1.6
+    eV_max = 3.2
     eV_step = 0.001
     k_min = 0.0
     k_max = 2.6
@@ -48,23 +48,24 @@ def main():
     # You can vary multiple parameters using nested loops.
     # For example, to vary 'a' (active layer thickness):
     
-    active_layer_thicknesses = [7] # Example values in um for t1
+    active_layer_thicknesses = [6.0] # Example values in um for t1
 
     for a in active_layer_thicknesses:
         if args.all:
             print(f"\n--- Running simulation for active layer thickness a = {a} um ---")
             S4_calculation.S4_calculation(eV_min, eV_max, eV_step, k_min, k_max, k_step, a, NoX, d, t, config, N)
-            plotting.reflectivity_dispersion(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config)
-            plotting.reflectivity_dip_k0(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config)
+            plotting.polariton_dispersion_parallel(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config)
+            plotting.polariton_dispersion_perp(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config)
         elif args.calc:
             S4_calculation.S4_calculation(eV_min, eV_max, eV_step, k_min, k_max, k_step, a, NoX, d, t, config, N)
         elif args.perp:
-            plotting.reflectivity_dip_k0(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config)
+            plotting.polariton_dispersion_perp(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config)
         elif args.paral:
-            plotting.reflectivity_dispersion(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config)
+            plotting.polariton_dispersion_parallel(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config)
         elif args.structure:
             print(f"\n--- Visualizing the structure drawing ---")
             plotting.visualize_structure(config, a, d)
 
 if __name__ == '__main__':
     main()
+
