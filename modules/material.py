@@ -75,7 +75,7 @@ def generate_PEAPI_equation_image(filename="PEAPI_equation.png"):
     ax.text(0.5, 0.2, params, fontsize=14, ha="center")
 
     # Define the output directory and create it if it doesn't exist
-    output_dir = './graphics/equations/'
+    output_dir = './graphics/support/'
     os.makedirs(output_dir, exist_ok=True)
 
     # Save the figure with a transparent background

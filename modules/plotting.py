@@ -287,7 +287,7 @@ def visualize_structure(config, a, d, t_SiO2, incident_angle=0):
              width=0.01 * d, color="red", length_includes_head=True)
     ax.text(0.25 * d, total_height + 0.25 * a, "Incident light", color="red", fontsize=10)
 
-    save_path = f'./graphics/structure_{config}_a({a})_d({d})_angle({incident_angle}).png'
+    save_path = f'./graphics/support/structure_{config}_a({a})_d({d})_angle({incident_angle}).png'
     plt.tight_layout()
     plt.savefig(save_path, dpi=300)
     plt.show()
@@ -324,7 +324,7 @@ def plot_dielectric_material(eV_min, eV_max, eV_step):
     
     # Adjust layout and save
     plt.tight_layout(rect=[0, 0, 1, 0.96]) # Adjust for suptitle
-    plt.savefig(f"./graphics/dielectric_constants.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"./graphics/support/dielectric_constants.png", dpi=300, bbox_inches='tight')
     plt.show()
 
 # This block allows the file to be run independently
