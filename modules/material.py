@@ -1,5 +1,6 @@
 import math
-
+import matplotlib.pyplot as plt
+import os
 
 def PEAPI(eV):
     p = math.pi
@@ -43,3 +44,44 @@ def SiO2(eV):
     k = (e**.5).imag
 	
     return (e_r_SiO2, e_i_SiO2, n, k)
+
+def generate_PEAPI_equation_image(filename="PEAPI_equation.png"):
+    """
+    Generates an image of the PEAPI dielectric function equation with parameter values.
+    """
+    # Parameter values
+    e_inf = 3.23
+    f1 = 0.134045
+    E1 = 2.3478
+    y1 = 0.008
+
+    # LaTeX equation string
+    equation = r"$\epsilon(E) = \epsilon_\infty + \frac{f E_X^2}{E_X^2 - E^2 + i \gamma_X E_X}$"
+
+    # Parameter values string
+    params = (
+        r"$\epsilon_\infty = $" + f"{e_inf:.2f}\n"
+        r"$f = $" + f"{f1:.4f}\n"
+        r"$E_X = $" + f"{E1:.4f} eV\n"
+        r"$\gamma = $" + f"{y1:.4f} eV"
+    )
+
+    # Create figure and axes
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.axis("off")  # Turn off axes
+
+    # Add equation and parameter values as text
+    ax.text(0.5, 0.7, equation, fontsize=24, ha="center")
+    ax.text(0.5, 0.2, params, fontsize=14, ha="center")
+
+    # Define the output directory and create it if it doesn't exist
+    output_dir = './graphics/equations/'
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Save the figure with a transparent background
+    plt.savefig(os.path.join(output_dir, filename), transparent=True, bbox_inches="tight", pad_inches=0.1)
+    plt.close(fig)  # Close the figure to free memory
+
+if __name__ == "__main__":
+    print("--- Generating PEAPI equation image ---")
+    generate_PEAPI_equation_image()  # Call the function to generate the image

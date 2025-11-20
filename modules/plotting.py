@@ -1,22 +1,25 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
+import os
 import cv2 as cv
 import matplotlib.font_manager as font_manager
 from progress.bar import IncrementalBar
 from scipy.signal import find_peaks
 from scipy.ndimage import gaussian_filter1d
-from modules import material
+from modules import material, utils
 
+np.float = float
 
 # === Reflectivity vs k_parallel ===
 
-def polariton_dispersion_parallel(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config):
+def polariton_dispersion_parallel(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, a, t_air, t_SiO2, E_X, config):
+    """
+    This plotting definition would extract the S4 calculation, then drawing the heatmap of polariton dispersion according to parallel wavevector.
+    """
     
     # Determine the configuration name for the filename
-    if config == "air":
-        config_name = "Configuration of Air_PEAPI_Air_"
-    else:
-        config_name = "Configuration of SiO2_PEAPI_SiO2_" 
+    config_name = utils.config(config)
 
     # === Construct the axes with eV range, wavevector, and XY grid ===
 
@@ -26,15 +29,10 @@ def polariton_dispersion_parallel(eV_min, eV_max, eV_step, k_min, k_max, k_step,
     X, Y = np.meshgrid(kx_All, eV_range)
 
     # === Read the data calculated from S4 ===
-
-    bar = IncrementalBar('Calculating',max=1, suffix='%(percent)d%% Elapsed %(elapsed_td)s - ETA %(eta_td)s')
-    filename = ('./data/' + config_name + "d(" + str(d) + ")_" + "t(" + str(t) + ")_" + "a(" + str(a) + ")_" + "eV_min(" + str(eV_min)+')_' + "eV_max(" + str(eV_max)+')_' + "eV_step(" + str(eV_step) + ')_' + "k_max(" + str(k_max) + ')_'+ "k_step(" + str(k_step) + ')_' + 'k-E-reflectivity.csv')
-    with open(filename, 'r') as csvfileR:
-        R = np.loadtxt(csvfileR, delimiter=',')
-    bar.next()
-    bar.finish()
+    filename = utils.generate_filename_base(config_name, d, a, t_air, t_SiO2, eV_min, eV_max, eV_step, k_max, k_step)
+    R = utils.read_reflectivity_file(filename)
     R_gr = R
-
+    
     # Font setup
 
     font = font_manager.FontProperties(family='DejaVu Sans', style='normal', size = 25)
@@ -68,57 +66,29 @@ def polariton_dispersion_parallel(eV_min, eV_max, eV_step, k_min, k_max, k_step,
     cbar.set_ticks([t for t in np.arange(0,1.1,0.2)])
     cbar.set_ticklabels(["{:.2f}".format(t) for t in np.arange(0,1.1,0.2)])
     
-    save_filename = ('./graphics/'+ config_name + "d(" + str(d) + ")_" + 
-               "t(" + str(t) + ")_" + 
-               "a(" + str(a) + ")_" + 
-               "eV_min(" + str(eV_min)+')_' + 
-               "eV_max(" + str(eV_max)+')_' + 
-               "eV_step(" + str(eV_step)+')_' +
-               "k_max(" + str(k_max) + ')_'+
-               "k_step(" + str(k_step) +')_'+
-               'k-E-reflectivity.png')
-    plt.savefig(save_filename, dpi=200, bbox_inches='tight')
+    plt.savefig(f"./graphics/" + filename + 'k-E-reflectivity.png', dpi=200, bbox_inches='tight')
     plt.show()
     
-    bar.next()
-    bar.finish()
+    #bar.next()
+    #bar.finish()
     return R_all
 
-def polariton_dispersion_perp(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, t, a, E_X, config):
+def polariton_dispersion_perp(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, a, t_air, t_SiO2, E_X, config):
     """
     Extract and plot the reflectivity dip at k_parallel = 0 (normal incidence).
-    Shows reflectivity vs energy and marks the polariton resonances.
+    Shows reflectivity vs energy and marks the polariton resonances (rabi splitting)
     """
     # === Identify general variables ===
 
     # Config
-    if config == "air":
-        config_name = "Configuration of Air_PEAPI_Air_"
-    else:
-        config_name = "Configuration of SiO2_PEAPI_SiO2_"
+    config_name = utils.config(config)
 
     # Energy & k grids
     eV_range = np.arange(eV_min, eV_max + np.float(eV_step/2), eV_step)
 
     # Load reflectivity data
-    filename = ('./data/' + config_name + "d(" + str(d) + ")_" +
-                "t(" + str(t) + ")_" + "a(" + str(a) + ")_" +
-                "eV_min(" + str(eV_min)+')_' +
-                "eV_max(" + str(eV_max)+')_' +
-                "eV_step(" + str(eV_step) + ')_' +
-                "k_max(" + str(k_max) + ')_' +
-                "k_step(" + str(k_step) + ')_' +
-                'k-E-reflectivity.csv')
-    R = np.loadtxt(filename, delimiter=',')
-
-    # Save file path for faster saving
-    save_path = ('./graphics/' + config_name + "d(" + str(d) + ")_" +
-                "t(" + str(t) + ")_" + "a(" + str(a) + ")_" +
-                "eV_min(" + str(eV_min)+')_' +
-                "eV_max(" + str(eV_max)+')_' +
-                "eV_step(" + str(eV_step) + ')_' +
-                "k_max(" + str(k_max) + ')_' +
-                "k_step(" + str(k_step) + ')_')
+    filename = utils.generate_filename_base(config_name, d, a, t_air, t_SiO2, eV_min, eV_max, eV_step, k_max, k_step)
+    R = utils.read_reflectivity_file(filename)
 
     # === Construct two regime for reflectivity ===
 
@@ -141,7 +111,7 @@ def polariton_dispersion_perp(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, 
         and then generates the first plot (Reflectivity vs. Energy).
         It returns the found dip energies for the next step.
         """
-        prominence_rel = 0.03
+        prominence_rel = 0.01
         abs_prom = max(1e-4, prominence_rel * (np.nanmax(R_k0) - np.nanmin(R_k0)))
 
         # --- Define energy regime ---
@@ -156,7 +126,7 @@ def polariton_dispersion_perp(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, 
         dips_up, dips_up_props = find_peaks(-R_above, prominence=abs_prom, distance=3)
 
         # --- Dip conditions ---
-        min_detuning = 0.1  # 20 meV
+        min_detuning = 0.05  # 20 meV
         valid = (E_above[dips_up] - E_X) > min_detuning
         dips_up = dips_up[valid]
         for key in dips_up_props:
@@ -181,7 +151,7 @@ def polariton_dispersion_perp(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, 
         plt.grid(alpha=0.3)
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=8)
         plt.tight_layout()
-        plt.savefig(save_path + 'reflectivity_dip_k0_split.png', dpi=300, bbox_inches='tight')
+        plt.savefig(f"./graphics/" + filename + 'reflectivity_dip_k0_split.png', dpi=300, bbox_inches='tight')
         plt.show()
 
         return E_up_dips, E_lp_dips
@@ -194,24 +164,26 @@ def polariton_dispersion_perp(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, 
         k_perp dispersion, and generates the second plot.
         """
         _, _, n_PEAPI_all, _ = material.PEAPI(eV_range)
+        pi = np.pi
 
         # --- Calculate k_perp for the dips ---
         idx_d = np.array([np.argmin(np.abs(eV_range - E)) for E in E_lp_dips])
         n_dips = n_PEAPI_all[idx_d]
-        k_perp_lp_dips = np.sqrt(((E_lp_dips * n_dips) / 1.2398419)**2)
+        e_inf = 3.23
+        k_perp_lp_dips = ((2* pi * n_dips * E_lp_dips) / 1.2398419)
 
         idx_p = np.array([np.argmin(np.abs(eV_range - E)) for E in E_up_dips])
         n_peaks = n_PEAPI_all[idx_p]
-        k_perp_up_dips = np.sqrt(((E_up_dips * n_peaks) / 1.2398419)**2)
+        k_perp_up_dips = ((2* pi * n_peaks * E_up_dips) / 1.2398419)
 
         # --- Calculation ---
         # Uncoupled photon
         e_inf = 3.23 #from material peapi
         n_background = np.sqrt(e_inf)
-        k_photon = (eV_range * n_background) / 1.2398419
+        k_photon = (2 * pi * eV_range * n_background) / 1.2398419
 
         # Rabi splitting
-        k_intersect = (E_X * n_background) / 1.2398419
+        k_intersect = (2 * pi * E_X * n_background) / 1.2398419
         LP_idx = np.argmin(np.abs(k_perp_lp_dips - k_intersect))
         UP_idx = np.argmin(np.abs(k_perp_up_dips - k_intersect))
         LP_E = E_lp_dips[LP_idx]
@@ -229,13 +201,13 @@ def polariton_dispersion_perp(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, 
         plt.grid(alpha=0.3)
         plt.plot(eV_range, k_photon, 'k--', label='Uncoupled Photon')
         plt.axvline(E_X, color='cyan', linestyle='--', label='Exciton energy')
-        plt.text(0.95, 0.05, f'Rabi Splitting: {rabi_meV:.2f} meV',
-                 verticalalignment='bottom', horizontalalignment='right',
-                 transform=plt.gca().transAxes,
-                 color='brown', fontsize=10)
+        #plt.text(0.95, 0.05, f'Rabi Splitting: {rabi_meV:.2f} meV',
+                 #verticalalignment='bottom', horizontalalignment='right',
+                 #transform=plt.gca().transAxes,
+                 #color='brown', fontsize=10)
         plt.subplots_adjust(right=0.8)
         plt.legend(loc='center left', bbox_to_anchor=(1.05, 0.5), fontsize=8)
-        plt.savefig(save_path + 'polariton_dispersion_kperp_vs_E.png', dpi=300, bbox_inches='tight')
+        plt.savefig(f"./graphics/" + filename + 'polariton_dispersion_kperp_vs_E.png', dpi=300, bbox_inches='tight')
         plt.show()
         return rabi_meV
 
@@ -249,7 +221,7 @@ def polariton_dispersion_perp(eV_min, eV_max, eV_step, k_min, k_max, k_step, d, 
 
 # === Visualization of structure and incident light ===
 
-def visualize_structure(config, a, d, incident_angle=0):
+def visualize_structure(config, a, d, t_SiO2, incident_angle=0):
     """
     Visualize the layer structure and light injection direction.
 
@@ -259,6 +231,8 @@ def visualize_structure(config, a, d, incident_angle=0):
         "air" or "sio2" configuration.
     a : float
         Thickness of PEAPI layer (nm).
+    t_SiO2 : float
+        Thickness of SiO2 layer (nm).
     d : float
         Period of structure (nm).
     incident_angle : float
@@ -267,15 +241,28 @@ def visualize_structure(config, a, d, incident_angle=0):
 
     # Define layers based on configuration
     if config.lower() == "air":
-        layers = [("Air (top)", 0, "skyblue"),
+        layers = [("Air (top)", 20, "skyblue"),
                   ("PEAPI", a, "gold"),
-                  ("Air (bottom)", 0, "skyblue")]
+                  ("Air (bottom)", 20, "skyblue")]
         title = "Configuration: Air / PEAPI / Air"
-    else:
-        layers = [("SiO₂ (top)", 50, "lightgrey"),
+    elif config.lower() == "sio2":
+        layers = [("SiO₂ (top)", 20, "lightgrey"),
                   ("PEAPI", a, "gold"),
-                  ("SiO₂ (bottom)", 50, "lightgrey")]
+                  ("SiO₂ (bottom)", 20, "lightgrey")]
         title = "Configuration: SiO₂ / PEAPI / SiO₂"
+    elif config.lower() == "air-sio2-sio2-air":
+        layers = [("Air (top)", 20, "skyblue"),
+                  ("SiO₂ (top)", t_SiO2, "lightgrey"),
+                  ("PEAPI", a, "gold"),
+                  ("SiO₂ (bottom)", t_SiO2, "lightgrey"),
+                  ("Air (bottom)", 20, "skyblue")]
+        title = "Configuration: Air / SiO₂ / PEAPI / SiO₂ / Air"
+    elif config.lower() == "air-sio2-air":
+        layers = [("Air (top)", 20, "skyblue"),
+                  ("SiO2 (top)", t_SiO2, "lightgrey"),
+                  ("PEAPI", a, "gold"),
+                  ("Air (bottom)", 20, "skyblue")]
+        title = "Configuration: Air / SiO₂ / PEAPI / Air"
 
     fig, ax = plt.subplots(figsize=(6, 3))
     z = 0
@@ -304,3 +291,48 @@ def visualize_structure(config, a, d, incident_angle=0):
     plt.tight_layout()
     plt.savefig(save_path, dpi=300)
     plt.show()
+
+# === Drawing dielectric relationship of materials ===
+
+def plot_dielectric_material(eV_min, eV_max, eV_step):
+    eV_range = np.arange(eV_min,eV_max+np.float(eV_step/2),eV_step)
+    
+    # Get material properties
+    e_r_PEAPI, e_i_PEAPI, _, _ = material.PEAPI(eV_range)
+    e_r_SiO2, e_i_SiO2, _, _ = material.SiO2(eV_range)
+    
+    # Create a figure with 1 row and 2 columns of subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), dpi=200, sharey=True)
+    fig.suptitle('Dielectric Constants', fontsize=16, fontweight='bold')
+    
+    # --- Left Plot: PEAPI ---
+    ax1.plot(eV_range, e_r_PEAPI, label=r'$\epsilon_r$', color='blue')
+    ax1.plot(eV_range, e_i_PEAPI, label=r'$\epsilon_i$', color='blue', linestyle='--')
+    ax1.set_title("PEAPI")
+    ax1.set_xlabel("Energy (eV)", fontweight='bold')
+    ax1.set_ylabel("Dielectric constant (a.u.)", fontweight='bold')
+    ax1.grid(alpha=0.4)
+    ax1.legend()
+    
+    # --- Right Plot: SiO2 ---
+    ax2.plot(eV_range, e_r_SiO2, label=r'$\epsilon_r$', color='red')
+    ax2.plot(eV_range, e_i_SiO2, label=r'$\epsilon_i$', color='red', linestyle='--')
+    ax2.set_title("SiO$_2$")
+    ax2.set_xlabel("Energy (eV)", fontweight='bold')
+    ax2.grid(alpha=0.4)
+    ax2.legend()
+    
+    # Adjust layout and save
+    plt.tight_layout(rect=[0, 0, 1, 0.96]) # Adjust for suptitle
+    plt.savefig(f"./graphics/dielectric_constants.png", dpi=300, bbox_inches='tight')
+    plt.show()
+
+# This block allows the file to be run independently
+if __name__ == '__main__':
+    # Define some default parameters to run the dielectric_material function
+    eV_min = 2.0
+    eV_max = 2.6
+    eV_step = 0.001
+    
+    print("--- Generating dielectric material plot ---")
+    plot_dielectric_material(eV_min, eV_max, eV_step)

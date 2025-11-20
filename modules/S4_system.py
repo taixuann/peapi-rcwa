@@ -69,6 +69,64 @@ def S4Module_SiO2_PEAPI_SiO2(eV, e_r_PEAPI, e_i_PEAPI, e_r_SiO2, e_i_SiO2, a, d,
     (Tc_0, Rc_0) = S.GetPowerFlux("Above", -1)
     return (Tc_0, Rc_0)
 
+# === Define the variables for SiO2/Air spacer/PEAPI/Air spacer/SiO2 ===
+
+def S4Module_SiO2_Air_PEAPI_Air_SiO2(eV, e_r_PEAPI, e_i_PEAPI, e_r_SiO2, e_i_SiO2, a, t_air, t_SiO2, d, k, N):
+    S = S4.New(Lattice=((d,0),(0,0)), NumBasis=N)
+
+    # === Set Material ===
+
+    S.SetMaterial(Name = "Air", Epsilon = 1 + 0*1j)
+    S.SetMaterial(Name = "Perovskite", Epsilon = e_r_PEAPI + e_i_PEAPI*1j)
+    S.SetMaterial(Name = "SiO2", Epsilon = e_r_SiO2 + e_i_SiO2*1j)
+
+    # === Structure construction ===
+
+    S.AddLayer("Above", 0, "Air")
+    S.AddLayer("Substrate_top", t_SiO2, "SiO2")
+    S.AddLayer("PEAPI", a, "Perovskite")
+    S.AddLayer("Substrate_bottom", t_SiO2, "SiO2")
+    S.AddLayer("Below", 0, "Air")
+
+    # === Source construction ===
+
+    angle = abs(np.arcsin(k*1.2398419/eV)*180/math.pi)
+    Ampl = 1
+    S.SetExcitationPlanewave(IncidenceAngles=(angle,0), sAmplitude=Ampl+0*1j, pAmplitude=1, Order=0)
+    S.SetFrequency(eV/1.2398419) #Convert frequency to wavevector
+
+    # === Transmission, Reflection results
+
+    (Tc_0, Rc_0) = S.GetPowerFlux("Above", -1)
+    return (Tc_0, Rc_0)
+
+def S4Module_Air_PEAPI_SiO2_Air(eV, e_r_PEAPI, e_i_PEAPI, e_r_SiO2, e_i_SiO2, a, t_air, t_SiO2, d, k, N):
+    S = S4.New(Lattice=((d,0),(0,0)), NumBasis=N)
+
+    # === Set Material ===
+
+    S.SetMaterial(Name = "Air", Epsilon = 1 + 0*1j)
+    S.SetMaterial(Name = "Perovskite", Epsilon = e_r_PEAPI + e_i_PEAPI*1j)
+    S.SetMaterial(Name = "SiO2", Epsilon = e_r_SiO2 + e_i_SiO2*1j)
+
+    # === Structure construction ===
+
+    S.AddLayer("Above", 0, "Air")
+    S.AddLayer("PEAPI", a, "Perovskite")
+    S.AddLayer("Substrate_bottom", t_SiO2, "SiO2")
+    S.AddLayer("Below", 0, "Air")
+
+    # === Source construction ===
+
+    angle = abs(np.arcsin(k*1.2398419/eV)*180/math.pi)
+    Ampl = 1
+    S.SetExcitationPlanewave(IncidenceAngles=(angle,0), sAmplitude=Ampl+0*1j, pAmplitude=1, Order=0)
+    S.SetFrequency(eV/1.2398419) #Convert frequency to wavevector
+
+    # === Transmission, Reflection results
+
+    (Tc_0, Rc_0) = S.GetPowerFlux("Above", -1)
+    return (Tc_0, Rc_0)
 
 
 
